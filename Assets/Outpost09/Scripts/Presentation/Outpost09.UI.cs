@@ -34,30 +34,31 @@ public partial class Outpost09
         else if (mode == "shop")
         {
             GUI.Label(new Rect(x, y + 30, 380, 28), "SUPPLY DEPOT  |  CREDITS " + credits, label);
-            ShopButton(x, y + 70, "MACHINE GUN  300", 300, () => { owned[1] = true; weapon = 1; }, owned[1]);
-            ShopButton(x, y + 115, "LASER RIFLE  600", 600, () => { owned[2] = true; weapon = 2; }, owned[2]);
-            ShopButton(x, y + 160, "GRENADE  100", 100, () => grenades++, false);
-            ShopButton(x, y + 205, "GATE +50  200", 200, () => gate = Mathf.Min(500, gate + 50), gate == 500);
-            ShopButton(x, y + 250, "PLAYER +50  100", 100, () => health = Mathf.Min(100, health + 50), health == 100);
+            ShopButton(x, y + 70, "MACHINE GUN", SupplyItem.MachineGun);
+            ShopButton(x, y + 115, "LASER RIFLE", SupplyItem.LaserRifle);
+            ShopButton(x, y + 160, "GRENADE", SupplyItem.Grenade);
+            ShopButton(x, y + 205, "GATE +50", SupplyItem.GateRepair);
+            ShopButton(x, y + 250, "PLAYER +50", SupplyItem.PlayerHeal);
             if (GUI.Button(new Rect(x, y + 300, 380, 42), shopBetweenWaves ? "NEXT WAVE" : "NEXT STAGE", button))
             {
-                if (shopBetweenWaves) ResumeCombat();
-                else { stage++; StartStage(); }
+                ContinueFromShop();
             }
         }
         else
         {
             GUI.Label(new Rect(x, y + 50, 380, 40), mode == "win" ? "MISSION COMPLETE" : mode == "lose" ? "GAME OVER" : "PAUSED", title);
             GUI.Label(new Rect(x, y + 110, 380, 80), $"STAGE {stage + 1}   KILLS {kills}\nCREDITS {credits}   TIME {elapsed:0}s", label);
-            if (GUI.Button(new Rect(x, y + 205, 380, 42), mode == "pause" ? "RESUME" : "RESTART", button)) { if (mode == "pause") { mode = "playing"; Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false; } else { ResetGame(); StartStage(); } }
+            if (GUI.Button(new Rect(x, y + 205, 380, 42), mode == "pause" ? "RESUME" : "RESTART", button)) { if (mode == "pause") ResumeCombat(); else RestartGame(); }
             if (GUI.Button(new Rect(x, y + 260, 380, 42), "MAIN MENU", button)) ResetGame();
         }
     }
 
-    void ShopButton(float x, float y, string text, int cost, System.Action purchase, bool disabled)
+    void ShopButton(float x, float y, string text, SupplyItem item)
     {
-        GUI.enabled = credits >= cost && !disabled;
-        if (GUI.Button(new Rect(x, y, 380, 38), disabled ? text + "  OWNED/FULL" : text, button)) { credits -= cost; purchase(); }
+        string caption = $"{text}  {SupplyPrice(item)}";
+        if (SupplyFull(item)) caption += "  OWNED/FULL";
+        GUI.enabled = CanBuySupply(item);
+        if (GUI.Button(new Rect(x, y, 380, 38), caption, button)) BuySupply(item);
         GUI.enabled = true;
     }
 }

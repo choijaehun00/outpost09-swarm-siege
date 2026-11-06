@@ -53,7 +53,7 @@ public class Alien : MonoBehaviour
         // shared path now contains densely sampled, rounded corners.
         if (kind == 2 && Vector3.Distance(transform.position, OutpostMapLayout.Gate) < 36f)
         {
-            if (Time.time >= attackAt) { attackAt = Time.time + 3; var shot = GameObject.CreatePrimitive(PrimitiveType.Sphere); shot.name = "Acid projectile"; shot.transform.position = transform.position + Vector3.up * .5f; shot.transform.localScale = Vector3.one * .45f; shot.GetComponent<Renderer>().material.color = Color.green; shot.AddComponent<AcidShot>().Setup(game, game.Target); }
+            if (Time.time >= attackAt) ShootAcid();
             return;
         }
         if (Vector3.Distance(transform.position, target) > .08f)
@@ -66,6 +66,19 @@ public class Alien : MonoBehaviour
         else if (nextPoint < route.Length - 1) nextPoint++;
         else if (Time.time >= attackAt) { attackAt = Time.time + (kind == 1 ? 1 : 2); game.HitGate(kind == 3 ? 15 : kind == 1 ? 3 : 5); }
     }
+
+    void ShootAcid()
+    {
+        attackAt = Time.time + 3f;
+        var shot = game.TrackTransient(GameObject.CreatePrimitive(PrimitiveType.Sphere));
+        shot.name = "Acid projectile";
+        shot.transform.position = transform.position + Vector3.up * .5f;
+        shot.transform.localScale = Vector3.one * AcidShot.Diameter;
+        shot.GetComponent<Renderer>().material.color = Color.green;
+        shot.GetComponent<Collider>().enabled = false;
+        shot.AddComponent<AcidShot>().Setup(game, game.Target);
+    }
+
     public void Damage(int value)
     {
         if (dead || value <= 0) return;

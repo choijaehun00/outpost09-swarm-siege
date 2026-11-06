@@ -6,13 +6,23 @@ using UnityEngine.InputSystem;
 // Owner: Combat team. Shared state is declared in Assets/Outpost09.cs.
 public partial class Outpost09
 {
+    const int Pistol = 0;
+    const int MachineGun = 1;
+    const int LaserRifle = 2;
+    const float ShotRange = 120f;
+    static readonly int[] MagazineSizes = { 12, 60, 30 };
+
+    float recoilPitch, machineGunSpread;
+
     void MovePost(int index, bool force = false)
     {
         if (!force && (index == post || Time.time < cooldown)) return;
         post = index; cooldown = Time.time + (force ? 0 : 1); flash = Time.time + .18f;
         cam.transform.position = posts[post];
         cam.transform.LookAt(OutpostMapLayout.AimPoints[index]);
-        yaw = cam.transform.eulerAngles.y; pitch = cam.transform.eulerAngles.x;
+        yaw = cam.transform.eulerAngles.y; pitch = Mathf.DeltaAngle(0f, cam.transform.eulerAngles.x);
+        recoilPitch = 0f;
+        machineGunSpread = 0f;
     }
 
     void Spawn(int kind, int n)
@@ -34,50 +44,127 @@ public partial class Outpost09
         elapsed += Time.deltaTime;
         var k = Keyboard.current; var m = Mouse.current;
         if (k == null || m == null) return;
-        if (k.escapeKey.wasPressedThisFrame) { mode = "pause"; Cursor.lockState = CursorLockMode.None; Cursor.visible = true; return; }
+        if (k.escapeKey.wasPressedThisFrame) { PauseCombat(); return; }
         if (k.f1Key.wasPressedThisFrame) MovePost(0);
         if (k.f2Key.wasPressedThisFrame) MovePost(1);
         if (k.f3Key.wasPressedThisFrame) MovePost(2);
         yaw += m.delta.ReadValue().x * .1f; pitch = Mathf.Clamp(pitch - m.delta.ReadValue().y * .1f, -70, 70);
-        cam.transform.rotation = Quaternion.Euler(pitch, yaw, 0);
-        cam.fieldOfView = m.rightButton.isPressed ? 45 : 70;
-        if (k.digit1Key.wasPressedThisFrame) weapon = 0;
-        if (k.digit2Key.wasPressedThisFrame && owned[1]) weapon = 1;
-        if (k.digit3Key.wasPressedThisFrame && owned[2]) weapon = 2;
+        recoilPitch = Mathf.MoveTowards(recoilPitch, 0f, 10f * Time.deltaTime);
+        machineGunSpread = Mathf.MoveTowards(machineGunSpread, 0f, 3f * Time.deltaTime);
+        cam.transform.rotation = Quaternion.Euler(pitch - recoilPitch, yaw, 0);
+        bool aiming = m.rightButton.isPressed;
+        cam.fieldOfView = aiming ? 45 : 70;
+        if (k.digit1Key.wasPressedThisFrame) weapon = Pistol;
+        if (k.digit2Key.wasPressedThisFrame && owned[MachineGun]) weapon = MachineGun;
+        if (k.digit3Key.wasPressedThisFrame && owned[LaserRifle]) weapon = LaserRifle;
         if (k.rKey.wasPressedThisFrame) Reload();
-        if (k.gKey.wasPressedThisFrame && grenades > 0) ThrowGrenade();
-        if ((weapon == 1 ? m.leftButton.isPressed : m.leftButton.wasPressedThisFrame) && Time.time >= fireAt && Time.time >= reloadAt) Shoot();
+        if (k.gKey.wasPressedThisFrame) ThrowGrenade();
+        bool pullingTrigger = weapon == MachineGun ? m.leftButton.isPressed : m.leftButton.wasPressedThisFrame;
+        if (pullingTrigger && Time.time >= fireAt && Time.time >= reloadAt) Shoot(aiming);
     }
 
-    void Shoot()
+    void Shoot(bool aiming)
     {
         if (ammo[weapon] <= 0) { Reload(); return; }
-        ammo[weapon]--; fireAt = Time.time + (weapon == 0 ? 1f / 3 : weapon == 1 ? .1f : .25f);
-        var direction = cam.transform.forward + (weapon == 1 ? Random.insideUnitSphere * .025f : Vector3.zero);
-        if (Physics.Raycast(cam.transform.position, direction, out var hit, 120))
+        ammo[weapon]--;
+
+        Vector3 origin = cam.transform.position;
+        Vector3 direction = cam.transform.forward;
+        switch (weapon)
         {
-            var e = hit.collider.GetComponentInParent<Alien>(); if (e != null) e.Damage(weapon == 0 ? 25 : weapon == 1 ? 12 : 40);
+            case Pistol:
+                fireAt = Time.time + .3f;
+                recoilPitch += .45f;
+                HitFirstEnemy(origin, direction, 25);
+                break;
+            case MachineGun:
+                fireAt = Time.time + .09f;
+                recoilPitch += aiming ? .45f : .8f;
+                float spread = (.35f + machineGunSpread) * (aiming ? .55f : 1f);
+                Vector2 offset = Random.insideUnitCircle * spread;
+                direction = cam.transform.rotation * (Quaternion.Euler(offset.y, offset.x, 0) * Vector3.forward);
+                machineGunSpread = Mathf.Min(2.5f, machineGunSpread + .55f);
+                HitFirstEnemy(origin, direction, 12);
+                break;
+            case LaserRifle:
+                fireAt = Time.time + .65f;
+                recoilPitch += 1.4f;
+                FireLaser(origin, direction);
+                break;
         }
-        flash = Time.time + .07f;
-        StartCoroutine(ShotEffect(cam.transform.position + cam.transform.forward * .8f, direction));
+        cam.transform.rotation = Quaternion.Euler(pitch - recoilPitch, yaw, 0);
     }
 
-    void Reload() { if (Time.time >= reloadAt) { reloadAt = Time.time + (weapon == 0 ? 1.5f : weapon == 1 ? 2.5f : 2); StartCoroutine(FinishReload(weapon, reloadAt)); } }
+    void HitFirstEnemy(Vector3 origin, Vector3 direction, int damage)
+    {
+        if (Physics.Raycast(origin, direction, out var hit, ShotRange, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            hit.collider.GetComponentInParent<Alien>()?.Damage(damage);
+    }
 
-    IEnumerator FinishReload(int w, float at) { yield return new WaitForSeconds(at - Time.time); ammo[w] = w == 0 ? 12 : w == 1 ? 60 : 30; }
+    void FireLaser(Vector3 origin, Vector3 direction)
+    {
+        var hits = Physics.RaycastAll(origin, direction, ShotRange, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+        System.Array.Sort(hits, (first, second) => first.distance.CompareTo(second.distance));
+
+        var struck = new HashSet<Alien>();
+        int damage = 65;
+        foreach (var hit in hits)
+        {
+            var enemy = hit.collider.GetComponentInParent<Alien>();
+            if (enemy == null) break;
+            if (!struck.Add(enemy)) continue;
+
+            enemy.Damage(damage);
+            if (struck.Count == 3) break;
+            damage -= 20;
+        }
+    }
+
+    void Reload()
+    {
+        if (Time.time < reloadAt || ammo[weapon] == MagazineSizes[weapon]) return;
+
+        float duration = weapon == Pistol ? 1.15f : weapon == MachineGun ? 2.5f : 2.2f;
+        reloadAt = Time.time + duration;
+        StartCoroutine(FinishReload(weapon, duration));
+    }
+
+    IEnumerator FinishReload(int reloadingWeapon, float duration)
+    {
+        yield return new WaitForSeconds(duration);
+        ammo[reloadingWeapon] = MagazineSizes[reloadingWeapon];
+    }
 
     void ThrowGrenade()
     {
+        if (grenades <= 0) return;
+
         grenades--;
-        var o = GameObject.CreatePrimitive(PrimitiveType.Sphere); o.name = "Grenade"; o.transform.position = cam.transform.position + cam.transform.forward; o.transform.localScale = Vector3.one * .35f;
-        o.GetComponent<Renderer>().material = Mat(Color.gray); var rb = o.AddComponent<Rigidbody>(); rb.AddForce(cam.transform.forward * 16 + Vector3.up * 5, ForceMode.VelocityChange);
-        StartCoroutine(Explode(o));
+        var grenade = TrackTransient(GameObject.CreatePrimitive(PrimitiveType.Sphere));
+        grenade.name = "Grenade";
+        grenade.transform.position = cam.transform.position + cam.transform.forward;
+        grenade.transform.localScale = Vector3.one * .35f;
+        grenade.GetComponent<Renderer>().material.color = Color.gray;
+        grenade.AddComponent<Grenade>().Launch(this, cam.transform.forward * 16 + Vector3.up * 5);
     }
 
-    IEnumerator Explode(GameObject o)
+    internal void ExplodeGrenade(Vector3 position, float radius)
     {
-        yield return new WaitForSeconds(2); if (o == null) yield break;
-        var pos = o.transform.position; foreach (var e in enemies.ToArray()) if (e != null && Vector3.Distance(pos, e.transform.position) < 5) e.Damage(Mathf.RoundToInt(120 * (1 - Vector3.Distance(pos, e.transform.position) / 5)));
-        var fx = GameObject.CreatePrimitive(PrimitiveType.Sphere); fx.transform.position = pos; fx.transform.localScale = Vector3.one * 5; fx.GetComponent<Renderer>().material = Mat(new Color(1, .4f, .05f)); Destroy(fx.GetComponent<Collider>()); Destroy(fx, .18f); Destroy(o);
+        foreach (var enemy in enemies.ToArray())
+        {
+            if (enemy == null) continue;
+
+            float distance = Vector3.Distance(position, enemy.transform.position);
+            if (distance < radius) enemy.Damage(Mathf.RoundToInt(120 * (1 - distance / radius)));
+        }
+
+        var effect = TrackTransient(GameObject.CreatePrimitive(PrimitiveType.Sphere));
+        effect.name = "Grenade blast";
+        effect.transform.position = position;
+        effect.transform.localScale = Vector3.one * (radius * 2);
+        effect.GetComponent<Renderer>().material.color = new Color(1, .4f, .05f);
+        var collider = effect.GetComponent<Collider>();
+        collider.enabled = false;
+        Destroy(effect, .18f);
     }
 }
