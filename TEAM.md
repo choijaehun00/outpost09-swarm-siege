@@ -19,6 +19,14 @@ Unity 버전: 6000.6.7f1. 실행: Assets/Scenes/SampleScene.unity를 열고 Play
 - 모델/텍스처/음원 추가 위치: Assets/Outpost09/Art/
 - 다음 작업: 실제 모델과 텍스처, 피격/사망 효과, UI 개선
 
+### 협곡 맵 제작 파일
+- `Presentation/OutpostCanyonWorld.cs`: 협곡·교량·초소·게이트·조명 생성
+- `Presentation/OutpostMapLayout.cs`: 세 초소, 조준점, 다섯 적 경로의 공용 좌표
+- `Presentation/Outpost09.Creatures.cs`: 몬스터 외형 (Combat의 Spawn에서 분리)
+- `Editor/OutpostCanyonTools.cs`: Tools → OUTPOST 09의 미리보기/편집 씬 생성
+- 자세한 배치와 실행 절차: `Assets/Outpost09/MAP_DESIGN.md`
+- 새 지형 연결을 위해 Combat의 Spawn/Alien은 공용 경로 좌표를 사용한다. 좌표 변경은 2번 담당자와 공유한다.
+
 ## 파일 연결 방식
 이번 분리는 동작을 유지하면서 파일 충돌을 줄이는 partial class 방식이다.
 Outpost09.*.cs 파일들은 컴파일 시 하나의 Outpost09 컴포넌트가 된다.
