@@ -1,19 +1,49 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public class AcidShot : MonoBehaviour
 {
-    Outpost09 game; Vector3 target; float born;
-    public void Setup(Outpost09 g, Vector3 t) { game = g; target = t; born = Time.time; }
+    internal const float Diameter = .45f;
+    const float Speed = 12f;
+    const float ArcHeight = 4f;
+
+    Outpost09 game;
+    Vector3 origin, target;
+    float duration, elapsed;
+
+    public void Setup(Outpost09 g, Vector3 t)
+    {
+        game = g;
+        origin = transform.position;
+        target = t;
+        duration = Vector3.Distance(origin, target) / Speed;
+    }
+
     void Update()
     {
-        if (!game.Playing) return;
-        var next = Vector3.MoveTowards(transform.position, target, 12 * Time.deltaTime);
-        if (Physics.Linecast(transform.position, next, out var hit) && hit.collider.GetComponent<Alien>() == null) { Destroy(gameObject); return; }
+        if (game == null || !game.Playing) return;
+
+        elapsed += Time.deltaTime;
+        float progress = duration > 0f ? Mathf.Clamp01(elapsed / duration) : 1f;
+        Vector3 position = transform.position;
+        Vector3 next = Vector3.Lerp(origin, target, progress);
+        next.y += 4f * ArcHeight * progress * (1f - progress);
+        Vector3 travel = next - position;
+        if (travel.sqrMagnitude > 0f)
+        {
+            var hits = Physics.SphereCastAll(position, Diameter * .5f, travel.normalized,
+                travel.magnitude, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            foreach (var hit in hits)
+            {
+                if (hit.collider.GetComponentInParent<Alien>() != null) continue;
+                Destroy(gameObject);
+                return;
+            }
+        }
+
         transform.position = next;
-        if (Vector3.Distance(transform.position, target) < .25f) { if (Vector3.Distance(game.Target, target) < .5f) game.HitPlayer(10); Destroy(gameObject); }
-        if (Time.time - born > 8) Destroy(gameObject);
+        if (progress < 1f) return;
+
+        if (game.Target == target) game.HitPlayer(10);
+        Destroy(gameObject);
     }
 }
