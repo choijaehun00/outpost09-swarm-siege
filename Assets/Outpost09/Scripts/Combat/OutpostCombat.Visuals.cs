@@ -1,11 +1,10 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
-// Owner: Presentation team. Shared state is declared in Assets/Outpost09.cs.
-public partial class Outpost09
+public sealed partial class OutpostCombat
 {
+    Transform weaponModel;
+    int displayedWeapon = -1;
+
     Material Mat(Color c)
     {
         var shader = Shader.Find("Universal Render Pipeline/Lit");
@@ -27,15 +26,8 @@ public partial class Outpost09
         o.GetComponent<Renderer>().material = Mat(color); return o;
     }
 
-    void BuildWorld()
+    void BuildWeaponModel()
     {
-        // Hide only the legacy sample objects at runtime; the source scene is preserved.
-        foreach (var root in gameObject.scene.GetRootGameObjects())
-            if (root.name == "Cube" || root.name == "Directional Light" || root.name == "Global Volume") root.SetActive(false);
-        if (FindAnyObjectByType<OutpostCanyonWorld>() == null)
-            new GameObject("OUTPOST 09 / Canyon World").AddComponent<OutpostCanyonWorld>().Build();
-        OutpostCanyonWorld.ConfigureCamera(cam);
-        for (int i = 0; i < posts.Length; i++) posts[i] = OutpostMapLayout.Stations[i];
         weaponModel = new GameObject("Weapon assembly").transform;
         weaponModel.SetParent(cam.transform, false);
         weaponModel.localPosition = new Vector3(.28f, -.26f, .52f);
@@ -74,12 +66,4 @@ public partial class Outpost09
         if (weapon == 2) for (int i = 0; i < 3; i++) Part(weaponModel, "Energy capacitor", PrimitiveType.Cube, new Vector3(.08f, .02f, .08f + i * .07f), new Vector3(.015f, .07f, .04f), Color.cyan);
     }
 
-    IEnumerator ShotEffect(Vector3 origin, Vector3 direction)
-    {
-        var o = GameObject.CreatePrimitive(PrimitiveType.Sphere); o.name = "Muzzle flash";
-        o.transform.position = origin; o.transform.localScale = Vector3.one * (weapon == 2 ? .35f : .20f);
-        o.GetComponent<Renderer>().material = Mat(weapon == 2 ? Color.cyan : new Color(1, .55f, .08f));
-        Destroy(o.GetComponent<Collider>());
-        yield return new WaitForSeconds(.08f); Destroy(o);
-    }
 }

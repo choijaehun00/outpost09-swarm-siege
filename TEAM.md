@@ -1,47 +1,48 @@
-# OUTPOST 09 — 3인 개발 분담
+# OUTPOST 09 · 3인 개발 분담
 
-Unity 버전: 6000.6.7f1. 실행: Assets/Scenes/SampleScene.unity를 열고 Play.
+Unity 6000.6.7f1에서 `Assets/Scenes/SampleScene.unity`를 열고 Play를 누른다. 메인 화면에서 START GAME을 누르면 첫 웨이브가 시작된다.
 
-## 1번: 게임 진행 / 통합
-- 담당: Assets/Outpost09/Scripts/Gameplay/Outpost09.Progression.cs
-- 담당: Assets/Outpost09.cs (시작 처리, 공용 상태), ProjectSettings, Packages, 메인 씬
-- 기능: 웨이브, 스테이지, 크레딧, 체력, 승패, 재시작
-- 다음 작업: 일시정지와 재시작 정리, 설정 데이터 분리
+## 담당 파일과 완료 기준
 
-## 2번: 전투 / 적
-- 담당: Assets/Outpost09/Scripts/Combat/ 아래 전체
-- 기능: 초소 이동, 입력, 사격, 재장전, 수류탄, 적 생성과 AI, 산성 투사체
-- 다음 작업: 장애물을 피하는 경로, 투사체 충돌 검증, 전투 밸런스
+| 담당 | 전담 파일 | 이번 단계 완료 기준 |
+|---|---|---|
+| 1번 · 게임 진행과 UI | `Assets/Outpost09/Scripts/Gameplay/` 전체, 메인 씬, `ProjectSettings/`, `Packages/` | 메인 화면, HUD, 상점, 일시정지, 결과 화면을 연결한다. 웨이브별 적 수·등장 간격·보상·가격을 조정하고 통합본에서 한 판을 끝까지 확인한다. |
+| 2번 · 전투와 적 | `Assets/Outpost09/Scripts/Combat/` 전체, 적·무기·투사체 프리팹과 전투 효과 | 기존 모델을 사용해 총기·수류탄·초소 전환을 확인한다. 최신 맵에서 적 4종의 이동·공격과 투사체 충돌을 검증한다. |
+| 3번 · 맵과 환경 | `Assets/Outpost09/Scripts/Map/`, `Assets/Outpost09/Art/`, `Assets/Outpost09/Resources/`, 협곡 도구·미리보기 씬과 생성 에셋 | 초소 3곳에서 주요 접근로가 보이게 하고, 스폰 5곳을 굴과 지형에 연결한다. 이 범위에서 협곡의 지형·조명·재질을 다듬는다. |
 
-## 3번: 그래픽 / UI
-- 담당: Assets/Outpost09/Scripts/Presentation/ 아래 전체
-- 기능: 맵, 조명, 모델, 발사 효과, HUD, 메뉴, 상점 화면
-- 모델/텍스처/음원 추가 위치: Assets/Outpost09/Art/
-- 다음 작업: 실제 모델과 텍스처, 피격/사망 효과, UI 개선
+### 1번 · 화면과 게임 규칙
 
-### 협곡 맵 제작 파일
-- `Presentation/OutpostCanyonWorld.cs`: 협곡·교량·초소·게이트·조명 생성
-- `Presentation/OutpostMapLayout.cs`: 세 초소, 조준점, 다섯 적 경로의 공용 좌표
-- `Presentation/Outpost09.Creatures.cs`: 몬스터 외형 (Combat의 Spawn에서 분리)
-- `Editor/OutpostCanyonTools.cs`: Tools → OUTPOST 09의 미리보기/편집 씬 생성
-- 자세한 배치와 실행 절차: `Assets/Outpost09/MAP_DESIGN.md`
-- 새 지형 연결을 위해 Combat의 Spawn/Alien은 공용 경로 좌표를 사용한다. 좌표 변경은 2번 담당자와 공유한다.
+- `Gameplay/UI/MainMenuUI.cs`에서 시작 화면을 수정한다. `Gameplay/UI/OutpostGameUI.cs`에서 HUD·상점·일시정지·결과 화면을 수정한다.
+- `Gameplay/Outpost09.Progression.cs`에서 웨이브·스테이지, 크레딧, 상점 규칙과 승패를 수정한다. `Gameplay/Outpost09.cs`는 씬 시작 시 맵·전투·UI를 연결한다.
 
-## 파일 연결 방식
-이번 분리는 동작을 유지하면서 파일 충돌을 줄이는 partial class 방식이다.
-Outpost09.*.cs 파일들은 컴파일 시 하나의 Outpost09 컴포넌트가 된다.
-따라서 이 파일들을 각각 GameObject에 붙이지 않는다. 시작 시 자동 생성된다.
-Alien.cs와 AcidShot.cs는 별도 컴포넌트다.
-독립 시스템과 이벤트 기반 구조로 완전히 분리된 상태는 아니므로 공용 변수/메서드 이름 변경은 1번 담당자와 먼저 합의한다.
+### 2번 · 입력, 전투 규칙, 전투 외형
 
-## 작업과 통합
-1. 각자 gameplay/이름, combat/이름, presentation/이름 브랜치에서 작업한다.
-2. 다른 담당자 파일을 바꿔야 하면 먼저 범위를 합의한다.
-3. Unity에서 컴파일 오류가 없는지 확인하고 담당 기능을 Play로 확인한다.
-4. 변경 내용을 검토받은 후 1번 담당자가 공용 브랜치에 합친다.
-5. 합친 뒤 시작 → 초소 이동 → 사격 → 웨이브 완료 → 구매 → 다음 웨이브를 확인한다.
-6. .meta 파일은 함께 공유한다. Library, Temp, Logs, obj는 공유하지 않는다.
+- `Combat/OutpostCombat.cs`에서 키 설정, 사격·장탄수·초소 전환과 적 생성 처리를 수정한다. HUD와 메인 화면에 표시할 키·무기 이름도 여기에서 제공한다.
+- `Combat/Alien.cs`, `Combat/AcidShot.cs`, `Combat/Grenade.cs`에서 적과 투사체 동작을 수정한다.
+- `Combat/OutpostCombat.Visuals.cs`와 `Combat/OutpostCombat.Creatures.cs`에서 무기와 적의 외형을 수정한다. 새 전투 에셋은 필요할 때 `Assets/Outpost09/CombatArt/`에 추가한다.
 
-## 검증 범위
-분리 작업은 기존 메서드를 담당 파일로 이동한 구조 변경이다.
-Unity 컴파일 및 실제 플레이 완료를 의미하지 않는다. 기존 경로 이동/일시정지 등의 미완성 기능도 별도 작업이 필요하다.
+### 3번 · 공간과 시야
+
+- `Map/OutpostMapLayout.cs`에서 초소의 위치와 조준점, 스폰 위치, 경로를 수정한다.
+- `Map/OutpostCanyonWorld*.cs`와 `Map/OutpostTerrainShape.cs`에서 협곡·교량·굴·초소·게이트·조명을 수정한다.
+- `Tools → OUTPOST 09 → Open Canyon Preview`로 확인한다. 미리보기와 생성 에셋 경로는 [맵 문서](Assets/Outpost09/MAP_DESIGN.md)에 있다.
+
+## 담당 영역이 만나는 곳
+
+| 변경 | 파일을 수정하는 담당자 |
+|---|---|
+| 적이 어디서 나오고 어느 길로 가는가 | 3번이 스폰과 경로 좌표를 수정한다. |
+| 적이 몇 마리씩 언제 나오고, 처치 시 얼마를 받는가 | 1번이 웨이브와 보상 데이터를 수정한다. |
+| 적이 경로를 어떻게 따라가고 피해를 주는가 | 2번이 AI와 충돌을 수정한다. |
+| 초소 바닥에 시야가 가리는가, F1 입력에 이동하는가 | 3번이 카메라 좌표를, 2번이 전환과 조준 입력을 수정한다. |
+| 수류탄 가격과 구매 버튼, 투척과 피해 | 1번이 가격과 화면을, 2번이 인벤토리와 투척·폭발을 수정한다. |
+
+Combat과 Map은 별도 Unity 어셈블리다. 둘은 `Contracts/OutpostBattlefield.cs`로 초소·게이트·경로를 주고받는다. 경로 좌표는 지면 기준이고 초소 번호는 왼쪽·중앙·오른쪽 순서다. Gameplay는 전투에 적 생성과 보급을 요청하고, 전투가 보내는 일시정지·피해·처치 이벤트를 처리한다. UI는 게임 진행과 전투에서 제공하는 상태를 읽는다.
+
+## 병렬 작업과 통합
+
+1. 역할 분리 변경을 한 PR로 검토한 뒤, 합쳐진 커밋에서 `gameplay/작업명`, `combat/작업명`, `map/작업명`을 각각 만든다. 기존 브랜치의 진행 중 변경은 담당 파일의 새 경로에 반영한다.
+2. 메인 씬과 `Contracts/` 변경은 1번이 통합 PR에서 맡는다. 공유 API를 바꿔야 할 때는 영향받는 담당자와 합의해 호출부도 같은 PR에서 갱신한다.
+3. 각자 담당 기능을 Play에서 확인한다. 2번과 3번이 별도 검증 씬을 만들면 각자의 폴더에 둔다.
+4. 1번은 통합 후 메인 화면 → 첫 웨이브 → 초소 전환·사격 → 상점 → 다음 웨이브 → 재시작을 확인한다.
+5. Unity 에셋을 옮기거나 추가할 때는 `.meta`도 함께 커밋한다. `Library`, `Temp`, `Logs`, `obj`는 Git에서 제외한다.

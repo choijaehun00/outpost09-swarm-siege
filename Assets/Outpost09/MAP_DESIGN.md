@@ -40,14 +40,9 @@ The A/B/C table entries are station centre reference positions (`StationCenters`
 - Optional URP runtime quality clone: 4x MSAA and increased shadow range; shared project rendering assets remain intact.
 
 ## Team handoff
-Presentation owns OutpostCanyonWorld.cs, OutpostMapLayout.cs, Outpost09.Creatures.cs, Outpost09.Visuals.cs, the flow shader/material and Editor/OutpostCanyonTools.cs.
+The map owner maintains `Scripts/Map/`, the canyon shaders and resources, and `Editor/OutpostCanyonTools.cs`. Edit station positions, spawn points and waypoint geometry in `Scripts/Map/OutpostMapLayout.cs`.
 
-Minimal combat integration in this change:
-- Spawn selects one of the five map routes and calls BuildAlienVisual (appearance moved out of Combat).
-- Alien.Setup accepts an optional route index. Alien follows the shared route points; health, speed, rewards and attack values are preserved.
-- MovePost uses shared per-station AimPoints.
-
-Combat owner: do not restore the old straight-line gate movement, because it passes through cliffs and empty canyon space. Coordinate layout changes with presentation. Future work: crowd separation, lane selection by wave, better hit/death feedback and checking all firing sightlines in Play mode.
+Combat reads station positions, aim points, gate position and routes through `Scripts/Contracts/OutpostBattlefield.cs`. Combat owns route following, enemy and weapon appearance, and player aiming. Gameplay owns the spawn schedule, rewards, menu and HUD. See the project root `TEAM.md` for team ownership and integration.
 
 ## Validation
 C# runtime and Editor scripts compiled against installed Unity 6000.6.7f1 / URP 17.6 assemblies using Roslyn. This is source/API compatibility checking, not an Editor import/render or gameplay test.

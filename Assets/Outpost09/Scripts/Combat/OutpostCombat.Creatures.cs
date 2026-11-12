@@ -1,9 +1,8 @@
 using UnityEngine;
 
-// Presentation owner: enemy appearance can now be edited without touching Spawn/AI.
-public partial class Outpost09
+public sealed partial class OutpostCombat
 {
-    void BuildAlienVisual(GameObject o, int kind)
+    void BuildAlienVisual(GameObject o, EnemyKind kind)
     {
         for (int leg = -1; leg <= 1; leg += 2)
         {
@@ -14,7 +13,7 @@ public partial class Outpost09
         }
         var eye = GameObject.CreatePrimitive(PrimitiveType.Sphere); eye.name = "Glow"; eye.transform.SetParent(o.transform); eye.transform.localPosition = new Vector3(0, .25f, -.48f); eye.transform.localScale = Vector3.one * .28f; eye.GetComponent<Renderer>().material = Mat(Color.cyan);
         Destroy(eye.GetComponent<Collider>());
-        o.GetComponent<Renderer>().material = Mat(kind == 3 ? new Color(.20f, .14f, .12f) : new Color(.19f, .24f, .12f));
+        o.GetComponent<Renderer>().material = Mat(kind == EnemyKind.Bruiser ? new Color(.20f, .14f, .12f) : new Color(.19f, .24f, .12f));
         var shell = new Color(.12f, .16f, .10f);
         for (int segment = 0; segment < 4; segment++)
             Part(o.transform, "Overlapping carapace", PrimitiveType.Sphere, new Vector3(0, .25f - segment * .22f, .06f), new Vector3(1.08f, .4f, .9f), shell);
