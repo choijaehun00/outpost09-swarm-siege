@@ -1,0 +1,8 @@
+{
+    "name": "Outpost09.Gameplay",
+    "references": [
+        "Outpost09.Contracts",
+        "Outpost09.Combat",
+        "Outpost09.Map"
+    ]
+}

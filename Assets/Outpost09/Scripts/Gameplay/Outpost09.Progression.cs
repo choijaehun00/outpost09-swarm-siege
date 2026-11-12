@@ -1,35 +1,56 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using EnemyKind = OutpostCombat.EnemyKind;
 
-// Owner: Gameplay team. Keep shared entry points stable for Combat and Presentation.
 public partial class Outpost09
 {
     [Header("Game progression")]
     [SerializeField, Min(0f)] float interWaveDelay = 5f;
     [SerializeField] int[] stageClearRewards = { 300, 500, 800 };
     Coroutine waveRoutine;
-    readonly HashSet<GameObject> transientObjects = new HashSet<GameObject>();
-    const int WavesPerStage = 3;
-    const int MaxGate = 500;
-    const int MaxHealth = 100;
+    internal const int WavesPerStage = 3;
+    internal const int MaxGate = 500;
+    internal const int MaxHealth = 100;
+    // Columns follow EnemyKind: Runner, Sprinter, Spitter, Bruiser.
+    readonly int[,] counts = { { 5, 0, 0, 0 }, { 6, 2, 0, 0 }, { 7, 4, 0, 0 }, { 6, 4, 0, 0 }, { 7, 0, 3, 0 }, { 8, 5, 4, 0 }, { 8, 5, 3, 0 }, { 8, 6, 4, 2 }, { 10, 7, 5, 3 } };
+    static readonly int[] KillRewards = { 20, 30, 40, 100 };
+    int stage, wave, credits, kills, gate = MaxGate, health = MaxHealth;
+    float elapsed;
+    string mode = "menu";
+    bool shopBetweenWaves;
     int StageCount => counts.GetLength(0) / WavesPerStage;
 
-    enum SupplyItem { MachineGun, LaserRifle, Grenade, GateRepair, PlayerHeal }
+    internal int Stage => stage;
+    internal int Wave => wave;
+    internal int Credits => credits;
+    internal int Kills => kills;
+    internal int GateHealth => gate;
+    internal int PlayerHealth => health;
+    internal float Elapsed => elapsed;
+    internal string Mode => mode;
+    internal bool ShopBetweenWaves => shopBetweenWaves;
+
+    internal enum SupplyItem { MachineGun, LaserRifle, Grenade, GateRepair, PlayerHeal }
+
+    void Update()
+    {
+        if (Playing) elapsed += Time.deltaTime;
+    }
 
     void SetGameMode(string next)
     {
         mode = next;
         bool playing = mode == "playing";
+        Combat.SetRunActive(playing);
         // One clock for wave waits, reloads, grenade physics and projectile lifetimes.
         Time.timeScale = playing ? 1f : 0f;
         Cursor.lockState = playing ? CursorLockMode.Locked : CursorLockMode.None;
         Cursor.visible = !playing;
     }
 
-    void PauseCombat() { if (Playing) SetGameMode("pause"); }
+    internal void PauseCombat() { if (Playing) SetGameMode("pause"); }
 
-    void ResumeCombat()
+    internal void ResumeCombat()
     {
         if (mode == "menu" || mode == "pause" || mode == "shop") SetGameMode("playing");
     }
@@ -39,10 +60,10 @@ public partial class Outpost09
         if (!Playing) return;
         shopBetweenWaves = betweenWaves;
         SetGameMode("shop");
-        ClearTransientObjects();
+        Combat.ClearTransientObjects();
     }
 
-    void StartStage()
+    internal void StartStage()
     {
         // Repeated button clicks cannot launch a second spawn loop.
         if (waveRoutine != null || (mode != "menu" && mode != "shop")) return;
@@ -53,7 +74,7 @@ public partial class Outpost09
         waveRoutine = StartCoroutine(Waves());
     }
 
-    void ContinueFromShop()
+    internal void ContinueFromShop()
     {
         if (mode != "shop") return;
         if (shopBetweenWaves)
@@ -87,14 +108,14 @@ public partial class Outpost09
                 {
                     while (mode == "pause") yield return null;
                     if (!Playing) yield break;
-                    Spawn(kind, n);
+                    Combat.Spawn((EnemyKind)kind, n, stage);
                     yield return new WaitForSeconds(stage == 0 ? 2f : stage == 1 ? 1.5f : 1f);
                 }
             }
             while (mode == "playing" || mode == "pause")
             {
-                enemies.RemoveAll(enemy => enemy == null);
-                if (Playing && enemies.Count == 0) break;
+                bool hasEnemies = Combat.HasLivingEnemies();
+                if (Playing && !hasEnemies) break;
                 yield return null;
             }
             if (!Playing) yield break;
@@ -127,21 +148,19 @@ public partial class Outpost09
     void EndRun(string result)
     {
         SetGameMode(result);
-        ClearTransientObjects();
+        Combat.EndRun();
         StopAllCoroutines();
         waveRoutine = null;
     }
 
-    public void Dead(Alien enemy, int reward)
+    void RewardDefeat(EnemyKind kind)
     {
-        if (Playing && enemy != null && enemies.Remove(enemy))
-        {
-            credits += Mathf.Max(0, reward) * 2;
-            kills++;
-        }
+        if (!Playing) return;
+        credits += Mathf.Max(0, KillRewards[(int)kind]) * 2;
+        kills++;
     }
 
-    int SupplyPrice(SupplyItem item)
+    internal int SupplyPrice(SupplyItem item)
     {
         switch (item)
         {
@@ -154,76 +173,70 @@ public partial class Outpost09
         }
     }
 
-    bool SupplyFull(SupplyItem item)
+    internal bool SupplyFull(SupplyItem item)
     {
         switch (item)
         {
-            case SupplyItem.MachineGun: return owned[1];
-            case SupplyItem.LaserRifle: return owned[2];
+            case SupplyItem.MachineGun: return Combat.OwnsWeapon(OutpostCombat.MachineGun);
+            case SupplyItem.LaserRifle: return Combat.OwnsWeapon(OutpostCombat.LaserRifle);
             case SupplyItem.GateRepair: return gate >= MaxGate;
             case SupplyItem.PlayerHeal: return health >= MaxHealth;
             default: return false;
         }
     }
 
-    bool CanBuySupply(SupplyItem item) => mode == "shop" && !SupplyFull(item) && credits >= SupplyPrice(item);
+    internal bool CanBuySupply(SupplyItem item) => mode == "shop" && !SupplyFull(item) && credits >= SupplyPrice(item);
 
-    bool BuySupply(SupplyItem item)
+    internal bool BuySupply(SupplyItem item)
     {
         if (!CanBuySupply(item)) return false;
         credits -= SupplyPrice(item);
         switch (item)
         {
-            case SupplyItem.MachineGun: owned[1] = true; weapon = 1; break;
-            case SupplyItem.LaserRifle: owned[2] = true; weapon = 2; break;
-            case SupplyItem.Grenade: grenades++; break;
+            case SupplyItem.MachineGun: Combat.UnlockWeapon(OutpostCombat.MachineGun); break;
+            case SupplyItem.LaserRifle: Combat.UnlockWeapon(OutpostCombat.LaserRifle); break;
+            case SupplyItem.Grenade: Combat.AddGrenade(); break;
             case SupplyItem.GateRepair: gate = Mathf.Min(MaxGate, gate + 50); break;
             case SupplyItem.PlayerHeal: health = Mathf.Min(MaxHealth, health + 50); break;
         }
         return true;
     }
 
-    internal GameObject TrackTransient(GameObject value)
-    {
-        transientObjects.RemoveWhere(item => item == null);
-        transientObjects.Add(value);
-        return value;
-    }
-
-    void ClearTransientObjects()
-    {
-        foreach (var item in transientObjects) if (item != null) { item.SetActive(false); Destroy(item); }
-        transientObjects.Clear();
-    }
-
-    void ResetGame()
+    internal void ResetGame()
     {
         SetGameMode("menu");
         StopAllCoroutines();
         waveRoutine = null;
-        // Deactivate immediately: delayed Destroy must not leave a same-frame collider behind.
-        foreach (var enemy in enemies) if (enemy != null) { enemy.gameObject.SetActive(false); Destroy(enemy.gameObject); }
-        enemies.Clear();
-        ClearTransientObjects();
-        foreach (var shot in FindObjectsByType<AcidShot>()) { shot.gameObject.SetActive(false); Destroy(shot.gameObject); }
-        stage = wave = credits = kills = grenades = weapon = 0;
+        stage = wave = credits = kills = 0;
         gate = MaxGate; health = MaxHealth;
-        owned[0] = true; owned[1] = owned[2] = false;
-        ammo[0] = 12; ammo[1] = 60; ammo[2] = 30;
-        elapsed = reloadAt = fireAt = cooldown = flash = 0;
+        elapsed = 0f;
         shopBetweenWaves = false;
-        MovePost(1, true);
-        flash = 0;
-        cam.fieldOfView = 70;
-        if (weaponModel != null) RebuildWeapon();
+        Combat.ResetRun();
     }
 
-    void RestartGame() { ResetGame(); StartStage(); }
+    internal void RestartGame() { ResetGame(); StartStage(); }
 
-    void OnEnable() { if (game == this) SetGameMode(mode); }
+    void OnEnable()
+    {
+        if (game != this || Combat == null) return;
+        Combat.PauseRequested += PauseCombat;
+        Combat.PlayerHit += HitPlayer;
+        Combat.GateHit += HitGate;
+        Combat.EnemyDefeated += RewardDefeat;
+        SetGameMode(mode);
+    }
+
     void OnDisable()
     {
         if (game != this) return;
+        if (Combat != null)
+        {
+            Combat.PauseRequested -= PauseCombat;
+            Combat.PlayerHit -= HitPlayer;
+            Combat.GateHit -= HitGate;
+            Combat.EnemyDefeated -= RewardDefeat;
+            Combat.SetRunActive(false);
+        }
         Time.timeScale = 1f;
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;

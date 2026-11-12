@@ -1,0 +1,7 @@
+{
+    "name": "Outpost09.Combat",
+    "references": [
+        "Outpost09.Contracts",
+        "Unity.InputSystem"
+    ]
+}

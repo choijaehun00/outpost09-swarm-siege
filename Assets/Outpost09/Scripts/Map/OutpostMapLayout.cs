@@ -42,6 +42,7 @@ public static class OutpostMapLayout
     };
     public static readonly bool[][] RouteBridges = new bool[Guides.Length][];
     public static readonly Vector3[][] Routes = BuildRoutes();
+    public static int RouteCount => Routes.Length;
     static bool GuideBridge(int r,int s) => (r==0&&s==4)||(r==1&&(s==3||s==5))||(r==2&&s==7)||(r==3&&s==3)||(r==4&&s==3);
     public static bool IsBridge(int route,int segment) => route>=0 && route<RouteBridges.Length && segment>=0 && segment<RouteBridges[route].Length && RouteBridges[route][segment];
 

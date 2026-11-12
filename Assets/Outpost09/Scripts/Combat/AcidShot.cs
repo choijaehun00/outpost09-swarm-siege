@@ -6,21 +6,21 @@ public class AcidShot : MonoBehaviour
     const float Speed = 12f;
     const float ArcHeight = 4f;
 
-    Outpost09 game;
+    OutpostCombat combat;
     Vector3 origin, target;
     float duration, elapsed;
 
-    public void Setup(Outpost09 g, Vector3 t)
+    internal void Setup(OutpostCombat owner, Vector3 aimPoint)
     {
-        game = g;
+        combat = owner;
         origin = transform.position;
-        target = t;
+        target = aimPoint;
         duration = Vector3.Distance(origin, target) / Speed;
     }
 
     void Update()
     {
-        if (game == null || !game.Playing) return;
+        if (combat == null || !combat.Playing) return;
 
         elapsed += Time.deltaTime;
         float progress = duration > 0f ? Mathf.Clamp01(elapsed / duration) : 1f;
@@ -43,7 +43,7 @@ public class AcidShot : MonoBehaviour
         transform.position = next;
         if (progress < 1f) return;
 
-        if (game.Target == target) game.HitPlayer(10);
+        if (combat.Target == target) combat.ReportPlayerHit(10);
         Destroy(gameObject);
     }
 }

@@ -1,57 +1,64 @@
+using System.Collections.Generic;
 using UnityEngine;
+using EnemyKind = OutpostCombat.EnemyKind;
 
 public class Alien : MonoBehaviour
 {
     // Persist scalar state, and resolve map waypoints by ID after script reloads.
-    [SerializeField] Outpost09 game;
-    [SerializeField] int kind, hp;
+    [SerializeField] OutpostCombat combat;
+    [SerializeField] EnemyKind kind;
+    [SerializeField] int hp;
     [SerializeField] float speed, attackAt;
     [SerializeField] int routeIndex = -1;
     [SerializeField] int nextPoint = 1;
     [SerializeField] bool hasRoute, dead;
 
-    float Clearance => kind == 3 ? 2f : kind == 1 ? .7f : 1f;
+    static readonly int[] HealthByKind = { 50, 30, 70, 250 };
+    static readonly float[] SpeedByKind = { 3.5f, 6f, 2.5f, 1.8f };
 
-    public void Setup(Outpost09 g, int k, int requestedRoute = 0)
+    internal static float BodyClearance(EnemyKind kind) => kind == EnemyKind.Bruiser ? 2f : kind == EnemyKind.Sprinter ? .7f : 1f;
+
+    internal void Setup(OutpostCombat owner, EnemyKind enemyKind, int requestedRoute)
     {
-        game = g;
-        kind = Mathf.Clamp(k, 0, 3);
-        hp = new[] { 50, 30, 70, 250 }[kind];
-        speed = new[] { 3.5f, 6, 2.5f, 1.8f }[kind];
+        combat = owner;
+        kind = enemyKind;
+        hp = HealthByKind[(int)kind];
+        speed = SpeedByKind[(int)kind];
         routeIndex = requestedRoute;
         nextPoint = 1;
-        hasRoute = OutpostMapLayout.TryGetRoute(routeIndex, out _);
+        hasRoute = combat.Battlefield.TryGetRoute(routeIndex, out _);
         dead = false;
     }
 
-    bool ResolveRoute(out Vector3[] route)
+    bool ResolveRoute(out IReadOnlyList<Vector3> route)
     {
-        if (hasRoute && OutpostMapLayout.TryGetRoute(routeIndex, out route))
+        var map = combat.Battlefield;
+        if (hasRoute && map.TryGetRoute(routeIndex, out route))
         {
-            nextPoint = Mathf.Clamp(nextPoint, 1, route.Length - 1);
+            nextPoint = Mathf.Clamp(nextPoint, 1, route.Count - 1);
             return true;
         }
         // Enemies already in Play mode may predate the new route fields.
-        if (OutpostMapLayout.TryFindNearestRoute(transform.position - Vector3.up * Clearance,
-            out routeIndex, out nextPoint) && OutpostMapLayout.TryGetRoute(routeIndex, out route))
+        if (map.TryFindNearestRoute(transform.position - Vector3.up * BodyClearance(kind),
+            out routeIndex, out nextPoint) && map.TryGetRoute(routeIndex, out route))
         {
             hasRoute = true;
             return true;
         }
         route = null;
-        Debug.LogError("OUTPOST 09: No valid enemy routes. Check OutpostMapLayout.Routes.", this);
+        Debug.LogError("OUTPOST 09: The active map has no valid enemy routes.", this);
         enabled = false;
         return false;
     }
     void Update()
     {
         if (dead) return;
-        if (game == null) game = FindAnyObjectByType<Outpost09>();
-        if (game == null || !game.Playing || !ResolveRoute(out var route)) return;
-        var target = route[nextPoint] + Vector3.up * Clearance;
+        if (combat == null) combat = FindAnyObjectByType<OutpostCombat>();
+        if (combat == null || !combat.Playing || !ResolveRoute(out var route)) return;
+        var target = route[nextPoint] + Vector3.up * BodyClearance(kind);
         // Range must be measured in metres, not "last 3 points": the artist's
         // shared path now contains densely sampled, rounded corners.
-        if (kind == 2 && Vector3.Distance(transform.position, OutpostMapLayout.Gate) < 36f)
+        if (kind == EnemyKind.Spitter && Vector3.Distance(transform.position, combat.Battlefield.GatePosition) < 36f)
         {
             if (Time.time >= attackAt) ShootAcid();
             return;
@@ -63,20 +70,25 @@ public class Alien : MonoBehaviour
             if (horizontal.sqrMagnitude > .001f) transform.rotation = Quaternion.LookRotation(-horizontal);
             transform.position = Vector3.MoveTowards(transform.position, target, speed * Time.deltaTime);
         }
-        else if (nextPoint < route.Length - 1) nextPoint++;
-        else if (Time.time >= attackAt) { attackAt = Time.time + (kind == 1 ? 1 : 2); game.HitGate(kind == 3 ? 15 : kind == 1 ? 3 : 5); }
+        else if (nextPoint < route.Count - 1) nextPoint++;
+        else if (Time.time >= attackAt)
+        {
+            bool sprinter = kind == EnemyKind.Sprinter;
+            attackAt = Time.time + (sprinter ? 1f : 2f);
+            combat.ReportGateHit(kind == EnemyKind.Bruiser ? 15 : sprinter ? 3 : 5);
+        }
     }
 
     void ShootAcid()
     {
         attackAt = Time.time + 3f;
-        var shot = game.TrackTransient(GameObject.CreatePrimitive(PrimitiveType.Sphere));
+        var shot = combat.TrackTransient(GameObject.CreatePrimitive(PrimitiveType.Sphere));
         shot.name = "Acid projectile";
         shot.transform.position = transform.position + Vector3.up * .5f;
         shot.transform.localScale = Vector3.one * AcidShot.Diameter;
         shot.GetComponent<Renderer>().material.color = Color.green;
         shot.GetComponent<Collider>().enabled = false;
-        shot.AddComponent<AcidShot>().Setup(game, game.Target);
+        shot.AddComponent<AcidShot>().Setup(combat, combat.Target);
     }
 
     public void Damage(int value)
@@ -85,7 +97,7 @@ public class Alien : MonoBehaviour
         hp -= value;
         if (hp > 0) return;
         dead = true;
-        if (game != null) game.Dead(this, new[] { 20, 30, 40, 100 }[Mathf.Clamp(kind, 0, 3)]);
+        if (combat != null) combat.ReportEnemyDefeated(this, kind);
         Destroy(gameObject);
     }
 }

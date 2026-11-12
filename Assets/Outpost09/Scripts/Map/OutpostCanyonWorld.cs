@@ -3,8 +3,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-// Presentation owner. Deterministic geometry; no wave, credit or damage logic.
-public partial class OutpostCanyonWorld : MonoBehaviour
+public partial class OutpostCanyonWorld : OutpostBattlefield
 {
     public const string Version = "Canyon / 03 - confluence frontier";
     readonly List<Material> ownedMaterials = new List<Material>();
@@ -14,6 +13,41 @@ public partial class OutpostCanyonWorld : MonoBehaviour
     System.Random random;
     Transform terrainRoot, baseRoot, pathsRoot, decorRoot;
     bool built;
+
+    public static OutpostBattlefield Prepare(Camera camera)
+    {
+        RenderSettings.ambientLight = new Color(.55f, .38f, .35f);
+        var world = FindAnyObjectByType<OutpostCanyonWorld>();
+        if (world == null)
+        {
+            world = new GameObject("OUTPOST 09 / Canyon World").AddComponent<OutpostCanyonWorld>();
+            world.Build();
+        }
+        ConfigureCamera(camera);
+        return world;
+    }
+
+    public override Vector3 GatePosition => OutpostMapLayout.Gate;
+    public override int RouteCount => OutpostMapLayout.RouteCount;
+
+    public override bool TryGetStation(int index, out Vector3 position, out Vector3 aimPoint)
+    {
+        position = aimPoint = default;
+        if (index < 0 || index >= OutpostMapLayout.Stations.Length) return false;
+        position = OutpostMapLayout.Stations[index];
+        aimPoint = OutpostMapLayout.AimPoints[index];
+        return true;
+    }
+
+    public override bool TryGetRoute(int index, out IReadOnlyList<Vector3> points)
+    {
+        bool found = OutpostMapLayout.TryGetRoute(index, out var route);
+        points = route;
+        return found;
+    }
+
+    public override bool TryFindNearestRoute(Vector3 position, out int routeIndex, out int nextPoint) =>
+        OutpostMapLayout.TryFindNearestRoute(position, out routeIndex, out nextPoint);
 
     float Range(float a, float b) => a + (float)random.NextDouble() * (b - a);
     Material Surface(string name, Color color, float metallic = 0, float smoothness = .2f, float glow = 0)

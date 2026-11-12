@@ -1,0 +1,8 @@
+{
+    "name": "Outpost09.Map",
+    "references": [
+        "Outpost09.Contracts",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
+    ]
+}
